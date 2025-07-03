@@ -1,5 +1,6 @@
 import os
 import json
+import textwrap
 from dataclasses import dataclass, field
 from typing import List
 from openai import OpenAI
@@ -26,19 +27,29 @@ client = OpenAI(
 @dataclass
 class AgentMonster:
     name: str
-    personality: str
+    description: str
     skills: List[str]
     hp: int = 100
+    mp: int = 100
+    lv: int = 0
 
     def to_prompt_string(self) -> str:
         """将 Agent 的信息格式化为适合 Prompt 的字符串"""
         skill_str = ", ".join(self.skills)
         return (
             f"名称: {self.name}\n"
-            f"性格: {self.personality}\n"
+            f"描述: {self.description}\n"
             f"当前HP: {self.hp}\n"
+            f"当前MP: {self.mp}\n"
             f"技能: [{skill_str}]"
         )
+
+
+def create_monster():
+    system_prompt = textwrap.dedent("""
+        根据用户描述创造一个魔幻世界的游戏生物，这个生物的的任何特征都需要与用户描述相关。同时请至少为铁塔补充如下特性：
+        
+        """)
 
 
 # --- 3. 核心逻辑：模拟一回合的行动 ---
@@ -61,38 +72,39 @@ def simulate_turn(active_agent: AgentMonster, opponent: AgentMonster, environmen
     history_str = "\n".join(history) if history else "战斗刚刚开始。"
 
     # --- 这是整个游戏最关键的部分：Prompt Engineering ---
-    system_prompt = """
-你是一个富有想象力的游戏AI裁判。你的任务是根据角色设定和当前战况，决定一个角色的行动。
-请严格遵守以下规则：
-1. 深入分析当前行动者的性格和技能。
-2. 结合环境和对手的状态，选择一个最合理的行动。
-3. 你的输出必须是一个JSON对象，不能包含任何其他文字。
-4. JSON对象必须包含三个字段：
-   - "action_name": 一个简短的行动名称（通常是技能名或一个描述性短语）。
-   - "description": 一段生动的、符合角色性格的行动描述。
-   - "thought_process": 角色为什么这么做的内心想法，用于调试。
-"""
+    system_prompt = textwrap.dedent("""
+    你是一个富有想象力的游戏AI裁判。你的任务是根据角色设定和当前战况，决定一个角色的行动。
+    请严格遵守以下规则：
+    1. 深入分析当前行动者的性格和技能。
+    2. 结合环境和对手的状态，选择一个最合理的行动。
+    3. 你的输出必须是一个JSON对象，不能包含任何其他文字。
+    4. JSON对象必须包含下文字段：
+       - "action_name": 一个简短的行动名称（通常是技能名或一个描述性短语）。
+       - "description": 一段生动的、符合角色性格的行动描述。
+       - "thought_process": 角色为什么这么做的内心想法，用于调试。
+       - "damage": 一个整型数值，表示这次行动对对手造成了多少伤害。对于不造成伤害的技能，这个字段应该是0。
+    """)
 
-    user_prompt = f"""
-# 战斗环境
-{environment}
-
-# 战斗历史
-{history_str}
-
-# 当前行动者
-{active_agent.to_prompt_string()}
-
-# 对手
-{opponent.to_prompt_string()}
-
-# 你的任务
-现在是 **{active_agent.name}** 的回合。请根据它的性格、技能和当前局势，决定它的行动。请以JSON格式返回结果。
-"""
+    user_prompt = textwrap.dedent(f"""
+    # 战斗环境
+    {environment}
+    
+    # 战斗历史
+    {history_str}
+    
+    # 当前行动者
+    {active_agent.to_prompt_string()}
+    
+    # 对手
+    {opponent.to_prompt_string()}
+    
+    # 你的任务
+    现在是 **{active_agent.name}** 的回合。请根据它的描述、技能和当前局势，决定它的行动。请以JSON格式返回结果。
+    """)
 
     try:
         response = client.chat.completions.create(
-            model="gemini-2.5-flash",  # gpt-4o 或 gpt-3.5-turbo 都可以，gpt-4o 效果更好
+            model="gemini-2.5-flash",
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
@@ -110,8 +122,10 @@ def simulate_turn(active_agent: AgentMonster, opponent: AgentMonster, environmen
         return {
             "action_name": "发呆",
             "description": f"{active_agent.name} 似乎因为某些未知原因，愣在原地，什么也没做。",
-            "thought_process": "LLM API调用失败，执行备用方案。"
+            "thought_process": "LLM API调用失败，执行备用方案。",
+            "damage": 0
         }
+
 
 
 # --- 4. 主程序：创建 Agent 并开始模拟 ---
