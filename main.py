@@ -11,13 +11,13 @@ from config.secret import GEMINI_KEY
 from google import genai
 
 # setup_proxy()
+from core.model import call_model
+from prompt.prompt import create_creature_system_prompt
+
 os.environ["HTTP_PROXY"] = "http://127.0.0.1:7890"
 os.environ["HTTPS_PROXY"] = "http://127.0.0.1:7890"
 
-# --- 1. 准备工作：加载 API 密钥并初始化客户端 ---
 
-
-# 为 Gemini 配置 API 密钥
 client = OpenAI(
     api_key=GEMINI_KEY,
     base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
@@ -45,14 +45,12 @@ class AgentMonster:
         )
 
 
-def create_monster():
-    system_prompt = textwrap.dedent("""
-        根据用户描述创造一个魔幻世界的游戏生物，这个生物的的任何特征都需要与用户描述相关。同时请至少为铁塔补充如下特性：
-        
-        """)
+def create_monster(query: str):
+    creature = call_model(system_prompt=create_creature_system_prompt, user_prompt=query)
 
+## https://open.spotify.com/track/4LsLiCvF7whO3wNqgqS8Mo?si=337440aaef174b25
 
-# --- 3. 核心逻辑：模拟一回合的行动 ---
+# 模拟一回合的行动 ---
 def simulate_turn(active_agent: AgentMonster, opponent: AgentMonster, environment: str, history: List[str]) -> dict:
     """
     使用 LLM 决定一个 Agent 的行动。
@@ -71,14 +69,15 @@ def simulate_turn(active_agent: AgentMonster, opponent: AgentMonster, environmen
     # 构建最近历史的字符串
     history_str = "\n".join(history) if history else "战斗刚刚开始。"
 
-    # --- 这是整个游戏最关键的部分：Prompt Engineering ---
     system_prompt = textwrap.dedent("""
     你是一个富有想象力的游戏AI裁判。你的任务是根据角色设定和当前战况，决定一个角色的行动。
     请严格遵守以下规则：
-    1. 深入分析当前行动者的性格和技能。
+    1. 深入分析当前行动者的描述和技能。
     2. 结合环境和对手的状态，选择一个最合理的行动。
-    3. 你的输出必须是一个JSON对象，不能包含任何其他文字。
-    4. JSON对象必须包含下文字段：
+    3. 角色特殊技能只代表他拥有的某个不寻常的技能，这个角色根据其描述可以使用其他合理技能。角色需要使用这些未列出的技能时请推断一个合理的MP消耗。
+    4. 角色的属性值不代表绝对的强弱，结合环境、描述和幸运可以使战斗有不一样的结果。
+    5. 你的输出必须是一个JSON对象，不能包含任何其他文字。
+    6. JSON对象必须包含下文字段：
        - "action_name": 一个简短的行动名称（通常是技能名或一个描述性短语）。
        - "description": 一段生动的、符合角色性格的行动描述。
        - "thought_process": 角色为什么这么做的内心想法，用于调试。
