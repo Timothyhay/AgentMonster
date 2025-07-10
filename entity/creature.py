@@ -1,15 +1,18 @@
-from dataclasses import dataclass
-from typing import List
+import json
+import textwrap
+from dataclasses import dataclass, field, asdict
+from typing import List, Dict
+from dataclasses_jsonschema import JsonSchemaMixin
 
 @dataclass
-class AbilityScores:
-    STR: int  # 力量
-    DEX: int  # 敏捷
-    CON: int  # 体质
-    INT: int  # 智力
-    WIS: int  # 感知
-    CHA: int  # 魅力
-    LUC: int  # 幸运
+class AbilityScores(JsonSchemaMixin):
+    STR: int  # 力量 Strength: 力气
+    DEX: int  # 敏捷 Dexterity: 灵活性、反应能力和平衡感
+    CON: int  # 体质 Constitution: 健康程度和耐力
+    INT: int  # 智力 Intelligence: 推理能力和记忆力
+    WIS: int  # 感知 Wisdom: 洞察力和精神坚韧程度
+    CHA: int  # 魅力 Charisma: 自信、仪态以及吸引力
+    LUC: int  # 幸运 Luck: 影响随机事件和机遇的因素
 
     def derive_combat_stats(self) -> dict:
         """根据能力值计算战斗属性"""
@@ -51,11 +54,62 @@ class AbilityScores:
 
 
 @dataclass
-class AgentMonster:
+class InventoryItem(JsonSchemaMixin):
+    name: str         # 物品名称
+    durability: int   # 物品耐久度
+    description: str  # 物品描述
+
+    def __post_init__(self):
+        """验证耐久度非负"""
+        if self.durability < 0:
+            raise ValueError(f"耐久度不能为负数: {self.durability}")
+
+
+@dataclass
+class Skill(JsonSchemaMixin):
+    name: str         # 技能名
+    mana_cost: int    # MP消耗
+    description: str  # 技能描述
+
+    def __post_init__(self):
+        """验证MP消耗非负"""
+        if self.mana_cost < 0:
+            raise ValueError(f"MP消耗不能为负数: {self.mana_cost}")
+
+
+
+@dataclass
+class Alignment(JsonSchemaMixin):
+    abbreviation: str  # 阵营缩写，例如 "LG"
+    name: str          # 阵营全称，例如 "Lawful Good"
+    description: str   # 阵营描述
+
+    # 存储所有阵营的字典，用于通过缩写索引
+    _alignments: Dict[str, 'Alignment'] = field(default_factory=dict)
+
+    @classmethod
+    def get_by_abbreviation(cls, abbreviation: str) -> 'Alignment':
+        """通过缩写获取阵营"""
+        return cls._alignments.get(abbreviation.upper(), None)
+
+    @classmethod
+    def all_alignments(cls) -> Dict[str, 'Alignment']:
+        """返回所有阵营的字典"""
+        return cls._alignments
+
+    def __post_init__(self):
+        """在实例化后将自身添加到 _alignments 字典"""
+        self._alignments[self.abbreviation.upper()] = self
+
+
+@dataclass
+class AgentMonster(JsonSchemaMixin):
     name: str
     description: str
-    skills: List[str]
+    alignment: Alignment
+    skills: List[Skill]
     ability_scores: AbilityScores
+    inventory: list[InventoryItem]
     hp: int = 100
     mp: int = 100
     lv: int = 0
@@ -67,16 +121,92 @@ class AgentMonster:
 
     def to_prompt_string(self) -> str:
         """将 Agent 的信息格式化为适合 Prompt 的字符串"""
-        skill_str = ", ".join(self.skills)
-        return (
-            f"**名称:**  {self.name}\n"
-            f"**描述:**  {self.description}\n"
-            f"**当前HP:** {self.hp}\n"
-            f"**当前MP:** {self.mp}\n"
-            f"**特殊技能:** [{skill_str}]"
+        skill_str = "; ".join(
+            f"{skill.name} (MP消耗: {skill.mana_cost}, 描述: {skill.description})"
+            for skill in self.skills
         )
+        return textwrap.dedent(f"""
+            **名称:**  {self.name}
+            **描述:**  {self.description}
+            **当前HP:** {self.hp}
+            **当前MP:** {self.mp}
+            **能力等级:** {self.ability_scores}
+            **特殊技能:** [{skill_str}]
+            **"
+        """)
+
+    def to_json(self, indent: int = 2) -> str:
+        """
+        将 AgentMonster 实例的所有属性序列化为 JSON 格式的字符串。
+
+        Args:
+            indent (int, optional): JSON 输出的缩进级别，用于美化输出。默认为 2。
+                                   如果为 None，则不进行美化，输出为紧凑格式。
+
+        Returns:
+            str: 代表该实例的 JSON 字符串。
+        """
+        # asdict 会递归地将 dataclass 及其嵌套的 dataclass 转换为字典
+        obj_dict = asdict(self)
+
+        # json.dumps 将字典转换为 JSON 字符串
+        # ensure_ascii=False 确保中文字符等能正常显示，而不是被转义
+        return json.dumps(obj_dict, indent=indent, ensure_ascii=False)
 
 
 
+# 初始化所有阵营
+ALIGNMENTS = [
+    Alignment(
+        abbreviation="LG",
+        name="Lawful Good",
+        description="守序善良生物尽力做社会认为正确的事情。毫不犹豫地与不公作斗争、保护无辜者的人，可能是守序善良的。"
+    ),
+    Alignment(
+        abbreviation="NG",
+        name="Neutral Good",
+        description="中立善良生物尽其所能地做行善，在规则限度内行事，但并不感觉被规则束缚。按照他人需求帮助他们的和善之人，可能是中立善良的。"
+    ),
+    Alignment(
+        abbreviation="CG",
+        name="Chaotic Good",
+        description="混乱善良生物依照其良心行动，几乎不在意别人怎么想。拦路抢劫某个冷酷男爵的税官，将赃款用于帮助穷人的人，可能是混乱善良的。"
+    ),
+    Alignment(
+        abbreviation="LN",
+        name="Lawful Neutral",
+        description="守序中立的个体依法律、传统或个人信条办事。遵守一套严格的行事准则，且不会被临危者的请求或邪恶的诱惑动摇的人，可能是守序中立的。"
+    ),
+    Alignment(
+        abbreviation="N",
+        name="Neutral",
+        description="绝对中立阵营是那些宁可回避道德问题，不愿意选边站，按当时看来最好的做法行事的人的阵营。厌倦了道德思辨的人可能是绝对中立的。"
+    ),
+    Alignment(
+        abbreviation="CN",
+        name="Chaotic Neutral",
+        description="混乱中立的生物按其一时奇想行事，认为他们的个人自由比其他一切都重要。靠小聪明谋生、四处游荡的流氓，可能是混乱中立的。"
+    ),
+    Alignment(
+        abbreviation="LE",
+        name="Lawful Evil",
+        description="守序邪恶的生物有条不紊地在传统、忠诚或秩序的规定之内获取他们想要的东西。在利用市民同时又阴谋获取权力的贵族，可能是守序邪恶的。"
+    ),
+    Alignment(
+        abbreviation="NE",
+        name="Neutral Evil",
+        description="中立邪恶是那些不在意在追逐自身想要的东西过程中造成破坏的人所属的阵营。随心所欲抢劫杀人的罪犯，可能是中立邪恶的。"
+    ),
+    Alignment(
+        abbreviation="CE",
+        name="Chaotic Evil",
+        description="混乱邪恶的生物会随意施暴，这种暴力受其憎恨或嗜血欲望的驱策。"
+    ),
+    Alignment(
+        abbreviation="UC",
+        name="Unaligned Creatures",
+        description="缺乏理性思维能力的生物没有阵营归属，即它们是无阵营。比如，普通鲨鱼shark是凶猛的掠食者，但它们并不邪恶，因此它们无阵营。"
+    ),
+]
 
 
