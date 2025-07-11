@@ -23,7 +23,9 @@ def simulate_turn(active_agent: AgentMonster, opponent: AgentMonster, environmen
     history_str = "\n".join(history) if history else "战斗刚刚开始。"
 
     observation_prompt = """
-    你需要扮演该角色，根据该角色的属性、技能与对手的战斗记录进行思考。
+    你是一个富有想象力的游戏AI裁判。你的任务是根据角色的属性、技能、与对手的战斗记录进行思考。判断该角色对对手的观察、印象等情报。
+    一般说来，感知和智力越高的角色更容易明白对手的能力、战术。对某个领域精通的角色也能快速理解对方与该领域有关的行为。
+    
     """
 
     system_prompt = textwrap.dedent("""
