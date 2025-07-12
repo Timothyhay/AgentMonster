@@ -13,11 +13,11 @@ from google import genai
 # setup_proxy()
 from core.model import call_model
 from entity.creature import AgentMonster
+from memory.valhalla import summon_from_valhalla
 from prompt.prompt import create_creature_system_prompt
 
 os.environ["HTTP_PROXY"] = "http://127.0.0.1:7890"
 os.environ["HTTPS_PROXY"] = "http://127.0.0.1:7890"
-
 
 client = OpenAI(
     api_key=GEMINI_KEY,
@@ -31,6 +31,7 @@ def create_monster(query: str):
                           output_schema_class=AgentMonster)
     creature.init_basic_status()
     return creature
+
 
 ## https://open.spotify.com/track/4LsLiCvF7whO3wNqgqS8Mo?si=337440aaef174b25
 
@@ -78,7 +79,7 @@ def simulate_turn(active_agent: AgentMonster, opponent: AgentMonster, environmen
     # 当前行动者
     {active_agent.to_prompt_string()}
     
-    # 对手
+    # 对对手的观察
     {opponent.to_prompt_string()}
     
     # 你的任务
@@ -112,50 +113,23 @@ def simulate_turn(active_agent: AgentMonster, opponent: AgentMonster, environmen
 
 # --- 4. 主程序：创建 Agent 并开始模拟 ---
 if __name__ == "__main__":
-    sample_character_description = """
-    我的伙伴是来自不列颠的骑士王，代号为Saber，真名是阿尔托莉雅·潘德拉贡。她本性高洁，忠诚而善良。我使用来自古代不列颠的神秘信物将她召唤而来。
-    她拥有很强的直觉、对魔力技能，也就是对各种魔法类攻击和控制都能有一定抵抗能力。
-    她使用叫风王结界的技能用风的力量扭曲光线的散射，使敌人无法看清她的武器——誓约胜利之剑。
-    敌人能看清这把圣剑时，就是她发动宝具的时候：这是一种使用圣剑将强大魔力蓄力后放出的毁灭性范围攻击。
-    
-    同时她也是一位大胃王，在直率的性格下有可爱的一面。
-    """
-    saber = create_monster(sample_character_description)
-    print(saber.to_json)
 
-    sample_character_description = """
-    这是一位眼神如蓝宝石一般纯净闪耀的冒险者，大家都叫他R。他是一位用剑和魔法的高手，但却不常使用寻常的剑，而是通过凝聚空气中的水汽等成分组成一把冰刃作为常用武器。
-    他的身体有很强的魔法亲和性，由于他对冰属性魔法的极高天赋，使他可以借助空气中的魔力与水汽修复自己的身体。这种对空气的利用也允许他制作致密冰晶组成的寒冰护甲。
-    他对极强的学习天赋和意志力，在他下定决心后没有什么可以阻止他。在必要时，他可以急速冰冻接触到敌人的血液，这会让绝大多数有机生命瞬间停止活动。
-    
-    他一直随身携带一柄皓月长剑，剑格是一个月牙型的空腔。这把武器比起剑更像权杖，因为它的独特设计使它成为无与伦比的的魔力导体，
-    他没有太多关于过去的回忆，但他的心灵也如冰晶一样善良纯洁；但在广阔多重宇宙中的冒险经历让他逐渐理解人性。但——这世界上只有一种英雄主义，他依然热爱自己的人生。
-    """
-    player = create_monster(sample_character_description)
+    player = create_monster(summon_from_valhalla("r"))
     print(player.to_json)
 
+    saber = create_monster(summon_from_valhalla("saber"))
+    print(saber.to_json)
+
+    berserker = create_monster(summon_from_valhalla("jotaro"))
+    print(berserker.to_json)
 
     print("--- 欢迎来到 LLM Agent Monster 战斗模拟器 MVP ---")
 
-    # # 创建两个 Agent Monster
-    # monster_a = AgentMonster(
-    #     name="熔岩巨像",
-    #     personality="暴躁，直接，崇尚绝对的力量，脑子里只有'碾碎'二字，行动大开大合。",
-    #     skills=["熔岩重拳", "火山咆哮", "坚硬岩石皮肤"]
-    # )
-    #
-    # monster_b = AgentMonster(
-    #     name="诡影刺客",
-    #     personality="狡猾，冷静，喜欢从阴影中发动突袭，善于利用环境和敌人的弱点。",
-    #     skills=["暗影步", "背刺", "毒刃"]
-    # )
-    #
-    # # 设定环境
     game_environment = "这是一个现代都市的公园里。公园有路灯、秋千、沙坑、滑梯和跷跷板。周围有自动售货机。"
 
     # 初始化战斗
     game_history = []
-    active_agent, opponent = player, saber
+    active_agent, opponent = berserker, saber
 
     print("\n[战斗开始!]")
     print(f"环境: {game_environment}")
@@ -181,7 +155,6 @@ if __name__ == "__main__":
         active_agent, opponent = opponent, active_agent
 
     print("\n--- 模拟结束 ---")
-
 
 # EXAMPLE
 """

@@ -9,7 +9,7 @@ from config.setup import setup_proxy
 
 setup_proxy()
 
-client = OpenAI(
+DEFAULT_CLIENT = OpenAI(
     api_key=GEMINI_KEY,
     base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
 )
@@ -58,7 +58,7 @@ def call_model(system_prompt=None, user_prompt=None, output_schema_class=None):
         messages.append({"role": "user", "content": user_prompt})
 
     # 调用 API
-    response = client.chat.completions.create(
+    response = DEFAULT_CLIENT.chat.completions.create(
         model="gemini-2.5-flash",  # 或者你使用的其他模型
         messages=messages,
         response_format=api_response_format,  # 使用我们定义的 api_response_format

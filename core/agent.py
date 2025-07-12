@@ -1,9 +1,42 @@
+import json
 import textwrap
 from typing import List
 
+from core.model import call_model, DEFAULT_CLIENT
 from entity.creature import AgentMonster
 
 
+def observe(active_agent: AgentMonster, environment: str, history: List[str],
+            impression: str) -> str:
+    # 构建最近历史的字符串
+    history_str = "\n".join(history) if history else "战斗刚刚开始。"
+    impression = ""
+
+    observation_prompt = textwrap.dedent(f"""
+    你是一个富有想象力的游戏AI裁判。你的任务是根据该角色的属性、特性、与对手的战斗记录，以该角色的视角进行思考，观察对手与环境。
+    通常来说角色的智力、感知越高能够越快理解对手的技能和魔法；战斗经验丰富的角色可能更容易理解对手的战术。
+
+    ** 扮演角色信息：**
+    {active_agent.to_json()}
+    
+    ** 环境：**
+    {environment}
+
+    ** 战斗记录：**
+    {history_str}
+
+    ** 过去的印象：**
+    {impression}
+
+    总之，请分析已有的情报，以该角色的视角输出一个字符串，表示当前回合该角色对对手的印象或理解，帮助该角色更好地战斗。
+    请注意，这句话应当简短但能全面地概述该角色迄今为止的观察。因为它会替换掉之前该角色的观察。
+    """)
+
+    observation = call_model(user_prompt=observation_prompt)
+    return observation
+
+
+# 模拟一回合的行动 ---
 def simulate_turn(active_agent: AgentMonster, opponent: AgentMonster, environment: str, history: List[str]) -> dict:
     """
     使用 LLM 决定一个 Agent 的行动。
@@ -21,10 +54,6 @@ def simulate_turn(active_agent: AgentMonster, opponent: AgentMonster, environmen
 
     # 构建最近历史的字符串
     history_str = "\n".join(history) if history else "战斗刚刚开始。"
-
-    observation_prompt = """
-    你需要扮演该角色，根据该角色的属性、技能与对手的战斗记录进行思考。
-    """
 
     system_prompt = textwrap.dedent("""
     你是一个富有想象力的游戏AI裁判。你的任务是根据角色设定和当前战况，决定一个角色的行动。
@@ -51,7 +80,7 @@ def simulate_turn(active_agent: AgentMonster, opponent: AgentMonster, environmen
     # 当前行动者
     {active_agent.to_prompt_string()}
 
-    # 对手
+    # 对对手的观察
     {opponent.to_prompt_string()}
 
     # 你的任务
@@ -59,7 +88,7 @@ def simulate_turn(active_agent: AgentMonster, opponent: AgentMonster, environmen
     """)
 
     try:
-        response = client.chat.completions.create(
+        response = DEFAULT_CLIENT.chat.completions.create(
             model="gemini-2.5-flash",
             messages=[
                 {"role": "system", "content": system_prompt},
