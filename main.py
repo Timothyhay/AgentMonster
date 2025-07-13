@@ -11,6 +11,7 @@ from config.secret import GEMINI_KEY
 from google import genai
 
 # setup_proxy()
+from core.agent import simulate_turn, observe
 from core.model import call_model
 from entity.creature import AgentMonster
 from memory.valhalla import summon_from_valhalla
@@ -25,7 +26,7 @@ client = OpenAI(
 )
 
 
-def create_monster(query: str):
+def create_monster(query: str) -> AgentMonster:
     creature = call_model(system_prompt=create_creature_system_prompt,
                           user_prompt=query,
                           output_schema_class=AgentMonster)
@@ -35,93 +36,18 @@ def create_monster(query: str):
 
 ## https://open.spotify.com/track/4LsLiCvF7whO3wNqgqS8Mo?si=337440aaef174b25
 
-# 模拟一回合的行动 ---
-def simulate_turn(active_agent: AgentMonster, opponent: AgentMonster, environment: str, history: List[str]) -> dict:
-    """
-    使用 LLM 决定一个 Agent 的行动。
-
-    Args:
-        active_agent: 当前行动的 Agent。
-        opponent: 对手 Agent。
-        environment: 当前的环境描述。
-        history: 最近的战斗历史记录。
-
-    Returns:
-        一个包含行动信息的字典。
-    """
-    print(f"\n[系统] 正在为 {active_agent.name} 思考行动...")
-
-    # 构建最近历史的字符串
-    history_str = "\n".join(history) if history else "战斗刚刚开始。"
-
-    system_prompt = textwrap.dedent("""
-    你是一个富有想象力的游戏AI裁判。你的任务是根据角色设定和当前战况，决定一个角色的行动。
-    请严格遵守以下规则：
-    1. 深入分析当前行动者的描述和技能。
-    2. 结合环境和对手的状态，选择一个最合理的行动。
-    3. 角色特殊技能只代表他拥有的某个不寻常的技能，这个角色根据其描述可以使用其他合理技能。角色需要使用这些未列出的技能时请推断一个合理的MP消耗。
-    4. 角色的属性值不代表绝对的强弱，结合环境、描述和幸运可以使战斗有不一样的结果。
-    5. 你的输出必须是一个JSON对象，不能包含任何其他文字。
-    6. JSON对象必须包含下文字段：
-       - "action_name": 一个简短的行动名称（通常是技能名或一个描述性短语）。
-       - "description": 一段生动的、符合角色性格的行动描述。
-       - "thought_process": 角色为什么这么做的内心想法，用于调试。
-       - "damage": 一个整型数值，表示这次行动对对手造成了多少伤害。对于不造成伤害的技能，这个字段应该是0。
-    """)
-
-    user_prompt = textwrap.dedent(f"""
-    # 战斗环境
-    {environment}
-    
-    # 战斗历史
-    {history_str}
-    
-    # 当前行动者
-    {active_agent.to_prompt_string()}
-    
-    # 对对手的观察
-    {opponent.to_prompt_string()}
-    
-    # 你的任务
-    现在是 **{active_agent.name}** 的回合。请根据它的描述、技能和当前局势，决定它的行动。请以JSON格式返回结果。
-    """)
-
-    try:
-        response = client.chat.completions.create(
-            model="gemini-2.5-flash",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            response_format={"type": "json_object"},  # 强制要求模型输出JSON
-            temperature=0.8,  # 增加一点创造性
-        )
-
-        action_data = json.loads(response.choices[0].message.content)
-        return action_data
-
-    except Exception as e:
-        print(f"[错误] 调用 LLM 失败: {e}")
-        # 返回一个保底的行动，防止程序崩溃
-        return {
-            "action_name": "发呆",
-            "description": f"{active_agent.name} 似乎因为某些未知原因，愣在原地，什么也没做。",
-            "thought_process": "LLM API调用失败，执行备用方案。",
-            "damage": 0
-        }
-
 
 # --- 4. 主程序：创建 Agent 并开始模拟 ---
 if __name__ == "__main__":
-
-    player = create_monster(summon_from_valhalla("r"))
+    summon_spell = summon_from_valhalla("r")
+    player = create_monster(summon_spell)
     print(player.to_json)
 
     saber = create_monster(summon_from_valhalla("saber"))
     print(saber.to_json)
 
-    berserker = create_monster(summon_from_valhalla("jotaro"))
-    print(berserker.to_json)
+    # berserker = create_monster(summon_from_valhalla("jotaro"))
+    # print(berserker.to_json)
 
     print("--- 欢迎来到 LLM Agent Monster 战斗模拟器 MVP ---")
 
@@ -129,27 +55,42 @@ if __name__ == "__main__":
 
     # 初始化战斗
     game_history = []
-    active_agent, opponent = berserker, saber
+    active_agent, opponent = player, saber
 
     print("\n[战斗开始!]")
     print(f"环境: {game_environment}")
     print(f"对战双方: {active_agent.name} vs {opponent.name}")
     print("-" * 20)
 
-    # 模拟 4 个回合
-    for turn in range(1, 10):
+    observation = ""
+    # 模拟 10 个回合
+    for turn in range(1, 20):
         print(f"--- 第 {turn} 回合 ---")
 
+
+        observation = observe(active_agent, game_environment, game_history, observation)
+
         # 核心：调用 LLM 模拟一回合
-        action_result = simulate_turn(active_agent, opponent, game_environment, game_history[-2:])  # 只传递最近2条历史记录
+        action_result = simulate_turn(active_agent, opponent, game_environment, game_history[-4:])  # 只传递最近2条历史记录
 
         # 打印结果
-        print(f"🧠 [{active_agent.name} 的想法]: {action_result.get('thought_process', '无')}")
-        print(f"⚔️ [{active_agent.name} 的行动]: {action_result['action_name']}")
+        print(f"🧠 [{active_agent.name} 的想法]: {action_result.get('thought', '无')}")
+        print(f"⚔️ [{active_agent.name} 的行动]: {action_result['action']}")
         print(f"묘 [{action_result['description']}]")
 
+        if action_result["mana_cost"]:
+            active_agent.mp -= action_result["mana_cost"]
+        if action_result["power"]:
+            opponent.hp -= action_result["power"]
+
         # 更新历史记录
-        game_history.append(f"第{turn}回合, {active_agent.name} {action_result['description']}")
+        game_history.append(f"第{turn}回合, {active_agent.name}: {action_result['description']}")
+        print(f"HP: {active_agent.hp} / MP: {active_agent.mp}")
+
+        if opponent.hp <= 0:
+            print(f"{active_agent.name} 胜利。")
+            break
+
 
         # 交换行动方
         active_agent, opponent = opponent, active_agent

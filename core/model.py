@@ -1,4 +1,5 @@
 import json
+import re
 
 from dacite import from_dict
 
@@ -30,26 +31,19 @@ def call_model(system_prompt=None, user_prompt=None, output_schema_class=None):
         - 否则，返回模型原始输出的字符串或字典。
     """
     messages = []
-
-    # 默认 response_format
     api_response_format = {"type": "text"}
 
     if output_schema_class:
-        # 1. 从 dataclass 生成 JSON Schema
         schema = output_schema_class.json_schema()
-
-        # 2. 更新 system_prompt，要求模型遵循此 Schema
         schema_prompt = (
             f"Please respond ONLY with a valid JSON object that strictly adheres to the following JSON Schema. "
-            f"Do not include any other text, explanations, or markdown formatting. "
+            f"Do not include any other text, explanations, or markdown formatting like ```json. "
             f"The JSON object must match this schema:\n{json.dumps(schema, indent=2)}"
         )
         if system_prompt:
             system_prompt = f"{system_prompt}\n\n{schema_prompt}"
         else:
             system_prompt = schema_prompt
-
-        # 3. 强制 API 使用 JSON 模式
         api_response_format = {"type": "json_object"}
 
     if system_prompt:
@@ -57,32 +51,47 @@ def call_model(system_prompt=None, user_prompt=None, output_schema_class=None):
     if user_prompt:
         messages.append({"role": "user", "content": user_prompt})
 
-    # 调用 API
     response = DEFAULT_CLIENT.chat.completions.create(
-        model="gemini-2.5-flash",  # 或者你使用的其他模型
+        model="gemini-1.5-flash",  # 使用你实际的模型
         messages=messages,
-        response_format=api_response_format,  # 使用我们定义的 api_response_format
+        response_format=api_response_format,
         temperature=0.8,
     )
-
     answer_content = response.choices[0].message.content
+    print(answer_content)
 
-    # 根据是否需要结构化输出来处理结果
     if output_schema_class:
         try:
-            # 将 JSON 字符串解析为字典
-            json_data = json.loads(answer_content)
+            # --- START OF CHANGE ---
+
+            # 2. 使用正则表达式从可能包含额外文本的响应中提取出 JSON 块。
+            #    r'\{[\s\S]*\}' 会匹配从第一个 '{' 到最后一个 '}' 之间的所有内容。
+            match = re.search(r'\{[\s\S]*\}', answer_content)
+
+            if not match:
+                # 如果连一个JSON对象都找不到，就抛出错误
+                raise json.JSONDecodeError("No JSON object found in the model's response.", answer_content, 0)
+
+            # 3. 获取匹配到的纯净的 JSON 字符串
+            json_string = match.group(0)
+
+            # 4. 将提取出的干净的 JSON 字符串解析为字典
+            json_data = json.loads(json_string)
+
+            # --- END OF CHANGE ---
+
             # 使用 dacite 将字典转换为 dataclass 实例
             return from_dict(data_class=output_schema_class, data=json_data)
+
         except (json.JSONDecodeError, Exception) as e:
             print(f"Error parsing model response or creating dataclass instance: {e}")
-            print(f"Raw model response:\n{answer_content}")
-            return None  # 或者抛出异常
+            print(f"Raw model response:\n{answer_content}")  # 打印原始、未清洗的响应，便于调试
+            return None
     else:
-        # 如果是普通的 JSON 请求但没有指定 schema，则尝试解析
+        # 非结构化输出逻辑保持不变
         if api_response_format.get("type") == "json_object":
             try:
                 return json.loads(answer_content)
             except json.JSONDecodeError:
-                return answer_content  # 解析失败则返回原始字符串
+                return answer_content
         return answer_content
