@@ -11,7 +11,7 @@ from config.secret import GEMINI_KEY
 from google import genai
 
 # setup_proxy()
-from core.agent import simulate_turn, observe
+from core.agent import simulate_turn, observe, Observation
 from core.model import call_model
 from entity.creature import AgentMonster
 from memory.valhalla import summon_from_valhalla
@@ -62,16 +62,20 @@ if __name__ == "__main__":
     print(f"对战双方: {active_agent.name} vs {opponent.name}")
     print("-" * 20)
 
-    observation = ""
+    observation = Observation()
+    battle_stat = dict()
+    battle_stat["power"] = 0
     # 模拟 10 个回合
     for turn in range(1, 20):
         print(f"--- 第 {turn} 回合 ---")
 
-
-        observation = observe(active_agent, game_environment, game_history, observation)
+        observation = observe(active_agent, game_environment, game_history, observation.impression, battle_stat)
+        incoming_damage = observation.damage
+        if incoming_damage:
+            active_agent.hp -= incoming_damage
 
         # 核心：调用 LLM 模拟一回合
-        action_result = simulate_turn(active_agent, opponent, game_environment, game_history[-4:])  # 只传递最近2条历史记录
+        action_result = simulate_turn(active_agent, game_environment, observation, game_history[-4:])  # 只传递最近2条历史记录
 
         # 打印结果
         print(f"🧠 [{active_agent.name} 的想法]: {action_result.get('thought', '无')}")
@@ -80,8 +84,7 @@ if __name__ == "__main__":
 
         if action_result["mana_cost"]:
             active_agent.mp -= action_result["mana_cost"]
-        if action_result["power"]:
-            opponent.hp -= action_result["power"]
+
 
         # 更新历史记录
         game_history.append(f"第{turn}回合, {active_agent.name}: {action_result['description']}")

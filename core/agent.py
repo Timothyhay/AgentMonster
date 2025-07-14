@@ -17,38 +17,58 @@ class InterAction(BaseModel):
     power: int
 
 
-def observe(active_agent: AgentMonster, environment: str, history: List[str], impression="") -> str:
+class Observation(BaseModel):
+    impression: str = ""
+    damage: int = 0
+
+
+def observe(active_agent: AgentMonster, environment: str, history: List[str], impression: str,
+            battle_stat: dict) -> dict:
     # 构建最近历史的字符串
     history_str = "\n".join(history) if history else "战斗刚刚开始。"
     if not impression:
         impression = f"{active_agent.name} 与对手初次见面。"
+    if not battle_stat:
+        battle_stat = dict()
+        battle_stat["power"] = 0
 
     observation_prompt = textwrap.dedent(f"""
-    你是一个富有想象力的游戏AI裁判。你的任务是根据该角色的属性、特性、与对手的战斗记录，以该角色的视角进行思考，观察对手与环境。
+    你是一个富有想象力的游戏AI裁判。你的任务是根据该角色的属性、特性、与对手的战斗记录，输出：
+    1. 以该角色的视角进行思考，对手与环境进行的观察。
     通常来说角色的智力、感知越高能够越快理解对手的技能和魔法；战斗经验丰富的角色可能更容易理解对手的战术。
+    2. 来自战斗记录最后一条的描述是上回合对手的招式，请以该招式威力分析角色实际受到的伤害。
+    通常来说角色的CON（体质）越高受到的物理伤害越低，WIS（感知）越高受到的魔法伤害越低。DEX（敏捷）影响角色完全回避攻击的几率。
+    LUC（幸运）、角色的经历和个性，以及角色可能能使用的物品都可能对最终受到的伤害有影响。
 
     ** 扮演角色信息：**
     {active_agent.to_json()}
     
     ** 环境：**
     {environment}
+    
+    ** 过去的观察：**
+    {impression}
 
     ** 战斗记录：**
     {history_str}
 
-    ** 过去的印象：**
-    {impression}
+    ** 上回合即将到来的招式威力：**
+    {battle_stat["power"]}
 
-    总之，请分析已有的情报，以该角色的视角输出一个字符串，表示当前回合该角色对对手的印象或理解，帮助该角色更好地战斗。
-    请注意，这句话应当简短但能全面地概述该角色迄今为止的观察。因为它会替换掉之前该角色的观察。
+    总之，请分析已有的情报，以该角色的视角输出一个JSON：
+    - "impression": 表示当前回合该角色对对手的印象或理解，帮助该角色更好地战斗。请注意，这句话应当简短但能全面地概述该角色迄今为止的观察。因为它会替换掉之前该角色的观察。
+    - "damage": 角色实际受到的伤害。如果角色不应该受到伤害，这个值应该为0。只要不是完美回避或完美防御，都应该造成一些伤害。
     """)
 
-    observation = call_model(user_prompt=observation_prompt)
+    observation = call_model(
+        user_prompt=observation_prompt,
+        output_schema_class=Observation
+    )
     return observation
 
 
 # 模拟一回合的行动 ---
-def simulate_turn(active_agent: AgentMonster, environment: str, observation: str, history: List[str]) -> dict:
+def simulate_turn(active_agent: AgentMonster, environment: str, observation: Observation, history: List[str]) -> dict:
     """
     使用 LLM 决定一个 Agent 的行动。
 
@@ -94,7 +114,7 @@ def simulate_turn(active_agent: AgentMonster, environment: str, observation: str
     {active_agent.to_json()}
 
     # 对对手的观察
-    {observation}
+    {observation.impression}
 
     # 你的任务
     现在是 **{active_agent.name}** 的回合。请根据它的描述、技能和当前局势，决定它的行动。请以JSON格式返回结果。
