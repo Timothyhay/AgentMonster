@@ -1,7 +1,7 @@
 import json
 import textwrap
 from dataclasses import dataclass, field, asdict
-from typing import List, Dict
+from typing import List, Dict, ClassVar
 from dataclasses_jsonschema import JsonSchemaMixin
 
 @dataclass
@@ -84,8 +84,11 @@ class Alignment(JsonSchemaMixin):
     name: str          # 阵营全称，例如 "Lawful Good"
     description: str   # 阵营描述
 
+    # 1. 将 _alignments 声明为类变量，而不是实例字段
+    #    这样 asdict 默认就不会处理它
+    _alignments: ClassVar[Dict[str, 'Alignment']] = {}
     # 存储所有阵营的字典，用于通过缩写索引
-    _alignments: Dict[str, 'Alignment'] = field(default_factory=dict)
+    # _alignments: Dict[str, 'Alignment'] = field(default_factory=dict)
 
     @classmethod
     def get_by_abbreviation(cls, abbreviation: str) -> 'Alignment':

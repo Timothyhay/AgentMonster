@@ -1,17 +1,81 @@
+import json
 import textwrap
 from typing import List
 
+from pydantic import BaseModel
+
+from core.model import call_model, DEFAULT_CLIENT
 from entity.creature import AgentMonster
 
 
-def simulate_turn(active_agent: AgentMonster, opponent: AgentMonster, environment: str, history: List[str]) -> dict:
+class InterAction(BaseModel):
+    action: str
+    description: str
+    type: str
+    thought: str
+    mana_cost: int
+    power: int
+
+
+class Observation(BaseModel):
+    impression: str = ""
+    damage: int = 0
+
+
+def observe(active_agent: AgentMonster, environment: str, history: List[str], impression: str,
+            battle_stat: dict) -> dict:
+    # 构建最近历史的字符串
+    history_str = "\n".join(history) if history else "战斗刚刚开始。"
+    if not impression:
+        impression = f"{active_agent.name} 与对手初次见面。"
+    if not battle_stat:
+        battle_stat = dict()
+        battle_stat["power"] = 0
+
+    observation_prompt = textwrap.dedent(f"""
+    你是一个富有想象力的游戏AI裁判。你的任务是根据该角色的属性、特性、与对手的战斗记录，输出：
+    1. 以该角色的视角进行思考，对手与环境进行的观察。
+    通常来说角色的智力、感知越高能够越快理解对手的技能和魔法；战斗经验丰富的角色可能更容易理解对手的战术。
+    2. 来自战斗记录最后一条的描述是上回合对手的招式，请以该招式威力分析角色实际受到的伤害。
+    通常来说角色的CON（体质）越高受到的物理伤害越低，WIS（感知）越高受到的魔法伤害越低。DEX（敏捷）影响角色完全回避攻击的几率。
+    LUC（幸运）、角色的经历和个性，以及角色可能能使用的物品都可能对最终受到的伤害有影响。
+
+    ** 扮演角色信息：**
+    {active_agent.to_json()}
+    
+    ** 环境：**
+    {environment}
+    
+    ** 过去的观察：**
+    {impression}
+
+    ** 战斗记录：**
+    {history_str}
+
+    ** 上回合即将到来的招式威力：**
+    {battle_stat["power"]}
+
+    总之，请分析已有的情报，以该角色的视角输出一个JSON：
+    - "impression": 表示当前回合该角色对对手的印象或理解，帮助该角色更好地战斗。请注意，这句话应当简短但能全面地概述该角色迄今为止的观察。因为它会替换掉之前该角色的观察。
+    - "damage": 角色实际受到的伤害。如果角色不应该受到伤害，这个值应该为0。只要不是完美回避或完美防御，都应该造成一些伤害。
+    """)
+
+    observation = call_model(
+        user_prompt=observation_prompt,
+        output_schema_class=Observation
+    )
+    return observation
+
+
+# 模拟一回合的行动 ---
+def simulate_turn(active_agent: AgentMonster, environment: str, observation: Observation, history: List[str]) -> dict:
     """
     使用 LLM 决定一个 Agent 的行动。
 
     Args:
         active_agent: 当前行动的 Agent。
-        opponent: 对手 Agent。
-        environment: 当前的环境描述。
+        environment: 战斗环境。
+        observation: 对环境和对手的观察。
         history: 最近的战斗历史记录。
 
     Returns:
@@ -22,12 +86,6 @@ def simulate_turn(active_agent: AgentMonster, opponent: AgentMonster, environmen
     # 构建最近历史的字符串
     history_str = "\n".join(history) if history else "战斗刚刚开始。"
 
-    observation_prompt = """
-    你是一个富有想象力的游戏AI裁判。你的任务是根据角色的属性、技能、与对手的战斗记录进行思考。判断该角色对对手的观察、印象等情报。
-    一般说来，感知和智力越高的角色更容易明白对手的能力、战术。对某个领域精通的角色也能快速理解对方与该领域有关的行为。
-    
-    """
-
     system_prompt = textwrap.dedent("""
     你是一个富有想象力的游戏AI裁判。你的任务是根据角色设定和当前战况，决定一个角色的行动。
     请严格遵守以下规则：
@@ -37,31 +95,33 @@ def simulate_turn(active_agent: AgentMonster, opponent: AgentMonster, environmen
     4. 角色的属性值不代表绝对的强弱，结合环境、描述和幸运可以使战斗有不一样的结果。
     5. 你的输出必须是一个JSON对象，不能包含任何其他文字。
     6. JSON对象必须包含下文字段：
-       - "action_name": 一个简短的行动名称（通常是技能名或一个描述性短语）。
+       - "action": 一个简短的行动名称（通常是技能名或一个描述性短语）。
+       - "type"：行动类型。攻击、吟唱、防御或其他。
        - "description": 一段生动的、符合角色性格的行动描述。
-       - "thought_process": 角色为什么这么做的内心想法，用于调试。
-       - "damage": 一个整型数值，表示这次行动对对手造成了多少伤害。对于不造成伤害的技能，这个字段应该是0。
+       - "thought": 角色思考这么行动的内心想法。
+       - "mana_cost": 这次行动消耗的MP。这个值不能大于角色剩余MP，但极特殊情况下（如竭尽全力时）可以适当调整。简单攻击的MP消耗可以为0。
+       - "power": 这次行动预计会对对手造成多少伤害。对于不造成伤害的行动，这个字段应该是0。
     """)
 
     user_prompt = textwrap.dedent(f"""
     # 战斗环境
     {environment}
 
-    # 战斗历史
+    # 最近的战斗历史
     {history_str}
 
     # 当前行动者
-    {active_agent.to_prompt_string()}
+    {active_agent.to_json()}
 
-    # 对手
-    {opponent.to_prompt_string()}
+    # 对对手的观察
+    {observation.impression}
 
     # 你的任务
     现在是 **{active_agent.name}** 的回合。请根据它的描述、技能和当前局势，决定它的行动。请以JSON格式返回结果。
     """)
 
     try:
-        response = client.chat.completions.create(
+        response = DEFAULT_CLIENT.chat.completions.create(
             model="gemini-2.5-flash",
             messages=[
                 {"role": "system", "content": system_prompt},
@@ -78,8 +138,10 @@ def simulate_turn(active_agent: AgentMonster, opponent: AgentMonster, environmen
         print(f"[错误] 调用 LLM 失败: {e}")
         # 返回一个保底的行动，防止程序崩溃
         return {
-            "action_name": "发呆",
+            "action": "发呆",
+            "type": "其他",
             "description": f"{active_agent.name} 似乎因为某些未知原因，愣在原地，什么也没做。",
-            "thought_process": "LLM API调用失败，执行备用方案。",
-            "damage": 0
+            "thought": "LLM API调用失败，执行备用方案。",
+            "mana_cost": 0,
+            "power": 0
         }
