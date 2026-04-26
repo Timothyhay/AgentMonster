@@ -8,21 +8,24 @@ from prompt.prompt import create_creature_system_prompt
 from engine.battle_manager import BattleManager
 from ui.stage import BattleStage
 
-def create_monster(query: str) -> AgentMonster:
+def create_monster(query: str, avatar_style: str = "") -> AgentMonster:
     creature = call_model(system_prompt=create_creature_system_prompt,
                           user_prompt=query,
                           output_schema_class=AgentMonster)
     creature.init_basic_status()
-    if not creature.avatar:
+    # Try to generate or pick an avatar
+    if avatar_style:
+        creature.generate_avatar(style=avatar_style)
+    elif not creature.avatar:
         creature.generate_avatar()
     return creature
 
 def main():
-    print("--- 欢迎来到 AgentMonster: 重构版 ---")
+    print("--- 欢迎来到 AgentMonster: 华丽重构版 ---")
     
     # 1. Setup participants
-    p1 = create_monster(summon_from_valhalla("r"))
-    p2 = create_monster(summon_from_valhalla("saber"))
+    p1 = create_monster(summon_from_valhalla("r"), avatar_style="fox")
+    p2 = create_monster(summon_from_valhalla("saber"), avatar_style="cat")
     
     # 2. Setup environment and UI
     game_env = "这是一个充满樱花的古老神社庭院。微风拂过，花瓣飘落。"

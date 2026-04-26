@@ -123,10 +123,15 @@ class AgentMonster(JsonSchemaMixin):
         self.hp = combat_stat["hp"]
         self.mp = combat_stat["mp"]
 
-    def generate_avatar(self):
-        """使用 LLM 根据描述生成 ASCII 艺术头像"""
+    def generate_avatar(self, style: str = ""):
+        """使用 LLM 或从候选库中选择 ASCII 艺术头像"""
+        if style:
+            from ui.assets import get_avatar
+            self.avatar = get_avatar(style)
+            return self.avatar
+
         from core.model import call_model
-        prompt = f"根据以下角色描述，生成一个精美的、具有代表性的 ASCII 艺术头像（约 10-15 行高）。只返回 ASCII 艺术本身，不要包含其他文字。\n角色名称: {self.name}\n角色描述: {self.description}"
+        prompt = f"根据以下角色描述，生成一个精美的、具有代表性的 ASCII 艺术头像（约 5-8 行高，宽度不超过20）。只返回 ASCII 艺术本身，不要包含其他文字。\n角色名称: {self.name}\n角色描述: {self.description}"
         self.avatar = call_model(user_prompt=prompt)
         return self.avatar
 
