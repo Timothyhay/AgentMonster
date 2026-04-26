@@ -116,11 +116,19 @@ class AgentMonster(JsonSchemaMixin):
     hp: int = 100
     mp: int = 100
     lv: int = 0
+    avatar: str = ""
 
     def init_basic_status(self):
         combat_stat = self.ability_scores.derive_combat_stats()
         self.hp = combat_stat["hp"]
         self.mp = combat_stat["mp"]
+
+    def generate_avatar(self):
+        """使用 LLM 根据描述生成 ASCII 艺术头像"""
+        from core.model import call_model
+        prompt = f"根据以下角色描述，生成一个精美的、具有代表性的 ASCII 艺术头像（约 10-15 行高）。只返回 ASCII 艺术本身，不要包含其他文字。\n角色名称: {self.name}\n角色描述: {self.description}"
+        self.avatar = call_model(user_prompt=prompt)
+        return self.avatar
 
     def to_prompt_string(self) -> str:
         """将 Agent 的信息格式化为适合 Prompt 的字符串"""

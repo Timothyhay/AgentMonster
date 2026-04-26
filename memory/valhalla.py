@@ -44,61 +44,34 @@ def summon_from_valhalla(character_name):
         return sample_character_description
 
 if __name__ == '__main__':
-    character = summon_from_valhalla("saber")
-    print(character)
+    from main import create_monster
+    from ui.stage import BattleStage
+    
+    # 召唤 Saber
+    saber_desc = summon_from_valhalla("saber")
+    saber = create_monster(saber_desc)
+    
+    print(f"正在为 {saber.name} 生成头像...")
+    saber.generate_avatar()
+    print("头像生成完成:")
+    print(saber.avatar)
 
-    sample = {
-  "name": "R",
-  "description": "R是一位目光纯净如蓝宝石的冒险者，以其独特的战斗风格闻名。他擅长将空气中的水汽凝聚成锋利的冰刃作为主要武器，而非依赖传统剑术。他的身体对魔法具有极强的亲和性，尤其在冰属性魔法方面天赋异禀，能够利用空气中的魔力与水汽修复自身损伤，并制造致密的寒冰护甲以抵御攻击。R的性格善良纯洁，但在广阔多重宇宙的冒险经历使他对人性有了深刻的理解。他拥有非凡的学习天赋和坚韧的意志力，能够迅速洞察环境与敌人的秘密。在极端情况下，他能瞬间冰冻接触到敌人的血液，导致绝大多数有机生命体瞬间停止活动。他热爱自己的人生，即使面对世间复杂，依然坚守内心的英雄主义。",
-  "alignment": {
-    "abbreviation": "NG",
-    "name": "中立善良",
-    "description": "中立善良生物尽其所能地做行善，在规则限度内行事，但并不感觉被规则束缚。按照他人需求帮助他们的和善之人，可能是中立善良的。"
-  },
-  "skills": [
-    {
-      "name": "冰刃塑形",
-      "mana_cost": 10,
-      "description": "将空气中的水汽凝聚成锋利的冰刃作为常用武器，可根据战斗需求改变形态与尺寸。"
-    },
-    {
-      "name": "寒冰护甲",
-      "mana_cost": 30,
-      "description": "利用空气中的魔力与水汽在自身周围形成一层致密的冰晶护甲，大幅提升物理防御力。"
-    },
-    {
-      "name": "生命冰愈",
-      "mana_cost": 40,
-      "description": "借助空气中的魔力与水汽，加速身体的自然愈合速度，修复轻微至中度损伤。"
-    },
-    {
-      "name": "极速冻血",
-      "mana_cost": 80,
-      "description": "接触到敌人血液时，可瞬间将其冰冻，使绝大多数有机生命体停止活动。对高体质或非生物敌人效果减弱。"
-    },
-    {
-      "name": "洞察先机",
-      "mana_cost": 20,
-      "description": "凭借非凡的学习天赋和意志力，R能够迅速分析战场环境、敌人的战斗风格与潜在弱点，从而制定最优策略。"
-    }
-  ],
-  "ability_scores": {
-    "STR": 12,
-    "DEX": 16,
-    "CON": 15,
-    "INT": 18,
-    "WIS": 17,
-    "CHA": 16,
-    "LUC": 13
-  },
-  "inventory": [
-    {
-      "name": "皓月长剑",
-      "durability": 100,
-      "description": "一柄剑格为月牙形空腔的长剑，其独特设计使其成为无与伦比的魔力导体，比起剑更像权杖。"
-    }
-  ],
-  "hp": 100,
-  "mp": 100,
-  "lv": 0
-}
+    # 召唤 R
+    r_desc = summon_from_valhalla("r")
+    r = create_monster(r_desc)
+    
+    print(f"正在为 {r.name} 生成头像...")
+    r.generate_avatar()
+    print("头像生成完成:")
+    print(r.avatar)
+
+    # 测试战斗舞台
+    print("\n进入战斗舞台演示...")
+    stage = BattleStage(saber, r)
+    stage.animate_idle()
+    
+    print("\nSaber 发动攻击!")
+    stage.animate_attack(1)
+    
+    print("\nR 释放法术!")
+    stage.animate_spell(2)
