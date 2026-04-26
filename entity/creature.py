@@ -213,3 +213,9 @@ ALIGNMENTS = [
 ]
 
 
+"""
+    e.g.
+"""
+
+character_r = AgentMonster(name='R', description='一位拥有蓝宝石般纯净眼眸的冒险者。他是冰系魔法与剑术的大师，以凝聚空气中的水汽形成冰刃作战。他拥有由冰晶组成的、宝石般坚固的外骨骼和护甲，并通过操纵空气进行快速自我修复。R具有卓越的学习天赋和坚韧的意志力，能迅速洞察环境与敌人的弱点。在极端情况下，他能运用急速结晶化能力瞬间冻结接触到的有机生命体血液。', alignment=Alignment(abbreviation='NG', name='中立善良', description='中立善良生物尽其所能地做行善，在规则限度内行事，但并不感觉被规则束缚。按照他人需求帮助他们的和善之人，可能是中立善良的。'), skills=[Skill(name='急速血液结晶化', mana_cost=30, description='通过接触迅速冻结目标体内的血液，使其瞬间停止活动。对无血液或非有机生命体效果有限或无效。')], ability_scores=AbilityScores(STR=13, DEX=17, CON=16, INT=18, WIS=17, CHA=14, LUC=13), inventory=[InventoryItem(name='皓月长剑', durability=999, description='一柄剑格呈月牙形空腔的长剑。与其说是剑，不如说更像权杖，因为它独特的设计使其成为无与伦比的魔力导体。')], hp=163, mp=0, lv=0)
+character_saber = AgentMonster(name='Saber', description='The Knight King of Britain, a highly noble, loyal, and kind warrior. She possesses exceptional intuition and resistance to magical attacks. In combat, she uses the Wind King Barrier to conceal her holy sword, the Sword of Promised Victory (Excalibur), making her attacks unpredictable. When revealing her true power, she unleashes a devastating ranged attack with Excalibur. Despite her regal bearing, she has a surprisingly large appetite and a straightforward, sometimes cute, personality.', alignment=Alignment(abbreviation='LG', name='守序善良', description='守序善良生物尽力做社会认为正确的事情。毫不犹豫地与不公作斗争、保护无辜者的人，可能是守序善良的.'), skills=[Skill(name='风王结界', mana_cost=10, description='使用风的力量扭曲光线，隐藏武器外观，使敌人难以看清所持的剑。'), Skill(name='对魔力', mana_cost=0, description='对魔法攻击和控制效果有很强的抗性。'), Skill(name='直觉', mana_cost=0, description='增强感知和预判能力，提升规避危险和战斗反应的速度。'), Skill(name='宝具：誓约胜利之剑', mana_cost=80, description='释放圣剑蓄积的强大魔力，造成大范围毁灭性打击。')], ability_scores=AbilityScores(STR=18, DEX=17, CON=18, INT=12, WIS=16, CHA=14, LUC=12), inventory=[InventoryItem(name='誓约胜利之剑', durability=999, description='来自湖中仙女的圣剑，蕴含强大魔力，是骑士王最重要的武器。')], hp=145, mp=3, lv=0)

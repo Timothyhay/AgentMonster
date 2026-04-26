@@ -6,7 +6,7 @@ from typing import Optional, Type
 from dacite import from_dict
 from pydantic import BaseModel, ValidationError
 
-from config.secret import GEMINI_KEY
+from config.secret import GEMINI_KEY, GEMINI_FLASH_MODEL
 from openai import OpenAI
 
 from config.setup import setup_proxy
@@ -77,7 +77,7 @@ def call_model(
 
     # 调用 API
     response = DEFAULT_CLIENT.chat.completions.create(
-        model="gemini-2.5-flash-preview-04-17",  # 建议使用 gpt-4o 或 gpt-4-turbo，它们对 JSON 模式的支持更好
+        model=GEMINI_FLASH_MODEL,  # 建议使用 gpt-4o 或 gpt-4-turbo，它们对 JSON 模式的支持更好
         messages=messages,
         response_format=api_response_format,
         temperature=0.7,

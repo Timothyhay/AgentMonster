@@ -13,6 +13,7 @@ from google import genai
 # setup_proxy()
 from core.agent import simulate_turn, observe, Observation
 from core.model import call_model
+from entity.battle import check_health_loss
 from entity.creature import AgentMonster
 from memory.valhalla import summon_from_valhalla
 from prompt.prompt import create_creature_system_prompt
@@ -99,6 +100,13 @@ if __name__ == "__main__":
         active_agent, opponent = opponent, active_agent
 
     print("\n--- 模拟结束 ---")
+    p1_hp_remains = check_health_loss(active_agent)
+    p2_hp_remains = check_health_loss(opponent)
+    print("Winner: ")
+    if p1_hp_remains > p2_hp_remains:
+        print(active_agent.name)
+    else:
+        print(opponent.name)
 
 # EXAMPLE
 """
